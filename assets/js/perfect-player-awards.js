@@ -1,7 +1,7 @@
 (function installPerfectPlayerAwardEngine() {
   'use strict';
 
-  var AWARD_ENGINE_VERSION = '2026.08.13-real-ballot-v1';
+  var AWARD_ENGINE_VERSION = '2026.10.20-rotation-v2';
   var MAJOR_65_GAME_AWARDS = { mvp:true, dpoy:true, mip:true, allNBA:true, allDefense:true };
   var INDIVIDUAL_AWARD_CONFIG = {
     mvp: { ballotSize:5, points:[10,7,5,3,1], noise:5.2 },
@@ -306,6 +306,13 @@
     var possessions = n(stats.fga, 0) + 0.44 * n(stats.fta, 0);
     var context = teamContexts[STATE.careerTeam] || { wins:n(STATE.season.wins), losses:n(STATE.season.losses), winPct:0.5, leagueRank:30, teamDefense:0.5 };
     var starter = !!STATE.season.isUserStarter;
+    // Keep per-game roles across promotions/demotions. Old saves lack snapshots;
+    // retain their previous fallback only for the unknown portion of the season.
+    var roleLogs = (STATE.season.games || []).filter(function(game) {
+      return game && game.stats && typeof game.isUserStarter === 'boolean';
+    }).slice(0, games);
+    var starts = roleLogs.filter(function(game) { return game.isUserStarter; }).length;
+    starts += starter ? Math.max(0, games - roleLogs.length) : 0;
     var attrs = STATE.attrs || {};
     return {
       key:'__USER__',
@@ -322,8 +329,8 @@
       eligibleGames:getUserEligibleGames(games, minutes),
       seasonEndingException:games >= 62 && !!(STATE.season.events && STATE.season.events.majorInjuryThisSeason),
       minutes:round1(minutes),
-      starts:starter ? games : 0,
-      benchGames:starter ? 0 : games,
+      starts:starts,
+      benchGames:games - starts,
       pts:round1(n(stats.pts) / games),
       reb:round1(n(stats.reb) / games),
       ast:round1(n(stats.ast) / games),

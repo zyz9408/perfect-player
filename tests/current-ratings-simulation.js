@@ -138,6 +138,30 @@ const strongDefenseAvg = averageProfile(offense, 'SF', 85);
 assert.ok(weakDefenseAvg.fgPct > strongDefenseAvg.fgPct + 0.025, 'opponent defense must reduce shooting efficiency');
 assert.ok(strongDefenseAvg.tov > weakDefenseAvg.tov, 'opponent defense must increase turnovers');
 
+// Issue #2: elite creation must not routinely turn into 40+ PPG seasons.
+// Hold opponents, pace, age/season bias and RNG fixed; test the actual stat engine.
+const scoringTiers = {};
+for (const rating of [75, 82, 90, 95, 99]) {
+  statContext.Math = seededMath(20260817 + rating);
+  statContext.STATE.season = { _usageBias:1.14 };
+  scoringTiers[rating] = averageProfile(attrs(rating), 'SG', 70, 4000);
+}
+assert.ok(scoringTiers[82].pts > 24 && scoringTiers[82].pts < 31, 'established scorers should retain their scoring role');
+assert.ok(scoringTiers[95].pts < 40, 'elite season scoring inflated: ' + scoringTiers[95].pts);
+assert.ok(scoringTiers[99].pts < 40, 'maximum-attribute season scoring inflated: ' + scoringTiers[99].pts);
+assert.ok(scoringTiers[99].pts > 32, 'exceptional offensive builds must remain exceptional');
+for (const rating of [82,90,95,99]) {
+  const previous = {82:75,90:82,95:90,99:95}[rating];
+  assert.ok(scoringTiers[rating].pts > scoringTiers[previous].pts, 'offensive rating progression must remain meaningful');
+}
+for (const position of ['PG','SG','SF','PF','C']) {
+  statContext.Math = seededMath(827);
+  statContext.STATE.season = { _usageBias:1.14 };
+  const elite = averageProfile(attrs(99), position, 70, 4000);
+  assert.ok(elite.pts > 32 && elite.pts < 40, position + ' elite scoring drifted: ' + elite.pts);
+}
+statContext.STATE.season = null;
+
 function makeBoxPlayer(name, pos, offenseValue, defenseValue) {
   return {
     name, cname:name, pos, ovr:Math.round((offenseValue + defenseValue) / 2),
@@ -205,5 +229,6 @@ assert.ok(strongWinRate > 0.84 && strongWinRate < 0.97, 'large team-strength gap
 console.log(JSON.stringify({
   ratings:{ teams:30, players:525, seasonMatches:517, noSeasonGames:8, top:topRatings },
   attributes:{ shooterHigh:shooterHighAvg, shooterLow:shooterLowAvg, creatorHigh:creatorHighAvg, creatorLow:creatorLowAvg, reboundHigh:reboundHighAvg, reboundLow:reboundLowAvg, rimHigh:rimHighAvg, rimLow:rimLowAvg },
+  scoringTiers:Object.fromEntries(Object.entries(scoringTiers).map(([rating, profile]) => [rating, {pts:profile.pts,fga:profile.fga,fta:profile.fta,mins:profile.mins}])),
   league:{ avgPoints:Number(avgPoints.toFixed(2)), avgPace:Number(avgPace.toFixed(2)), strongWinRate:Number(strongWinRate.toFixed(3)) },
 }, null, 2));
